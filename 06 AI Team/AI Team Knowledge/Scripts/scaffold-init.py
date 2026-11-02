@@ -1920,6 +1920,11 @@ def do_apply(root, b, out):
 #   [hooks.state."<abs vault>/.codex/hooks.json:<event>:<i>:<j>"]
 #   trusted_hash = "..."
 #
+# On Windows the path is written with backslashes, and a TOML basic string
+# doubles each one (`C:\\vault\\.codex...`), so the key is unescaped and both
+# sides are compared in one spelling (_trust_key_matches). The exact header
+# Codex writes on Windows has not been seen yet, so either separator matches.
+#
 # So the answer is per machine AND per path, and moving or renaming the folder
 # silently drops it. It is worth reading because the failure it hides is the
 # worst shape a guard can have: `codex exec` never asks and runs no untrusted
@@ -1953,9 +1958,36 @@ CODEX_SANDBOX_TEXT = (
     "was refused and says the harness is incomplete.")
 
 # A table header, and the one key inside it that proves a review happened.
-_TOML_TABLE = re.compile(r'^\s*\[\s*hooks\.state\s*\.\s*"(.*)"\s*\]\s*$')
+_TOML_TABLE = re.compile(r"""^\s*\[\s*hooks\.state\s*\.\s*(?:"(.*)"|'(.*)')\s*\]\s*$""")
 _TOML_ANY_TABLE = re.compile(r"^\s*\[")
 _TOML_HASH = re.compile(r"^\s*trusted_hash\s*=")
+_TOML_ESCAPE = re.compile(r"\\(u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|.)")
+_TOML_ESCAPES = {"b": "\b", "t": "\t", "n": "\n", "f": "\f", "r": "\r", '"': '"', "\\": "\\"}
+
+
+def _toml_basic(s):
+    """The value of a TOML basic string. An escape TOML does not define is left
+    as written, so a hand-typed `C:\\Users` still reads as that path."""
+    def one(m):
+        e = m.group(1)
+        if e[0] in "uU" and len(e) > 1:
+            return chr(int(e[1:], 16))
+        return _TOML_ESCAPES.get(e, m.group(0))
+    return _TOML_ESCAPE.sub(one, s)
+
+
+def _trust_path(p):
+    """One spelling of a path, for comparing: forward slashes, and for a Windows
+    path no `\\\\?\\` prefix and no case, which Windows does not distinguish."""
+    s = p.replace("\\", "/")
+    if s.startswith("//?/"):
+        s = s[4:]
+    return s.lower() if re.match(r"[A-Za-z]:/|//", s) else s
+
+
+def _trust_key_matches(key, root):
+    """Does this unescaped [hooks.state] key name the hooks file of `root`?"""
+    return _trust_path(key).startswith(_trust_path("%s/.codex/hooks.json:" % root))
 
 
 def codex_config_path():
@@ -1977,18 +2009,18 @@ def codex_trust(root, config_path=None):
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return "unknown"
-    prefix = "%s/.codex/hooks.json:" % Path(root).resolve()
+    vault = str(Path(root).resolve())
     key, has_hash = None, False
 
     def _proved():
-        return key is not None and key.startswith(prefix) and has_hash
+        return key is not None and has_hash and _trust_key_matches(key, vault)
 
     for line in text.split("\n"):
         m = _TOML_TABLE.match(line)
         if m:
             if _proved():
                 return "yes"
-            key, has_hash = m.group(1), False
+            key, has_hash = _toml_basic(m.group(1)) if m.group(1) is not None else m.group(2), False
             continue
         if _TOML_ANY_TABLE.match(line):
             if _proved():
