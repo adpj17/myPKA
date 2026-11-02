@@ -48,7 +48,9 @@ Two shapes of capture, two routes, never both on one item:
    run that path with `<wrapper-note> --summary "..."
    --into "[[...]]" --capture "concept:inbox/<...>/<binary>"`. The script
    compares the shelf copy with the inbox original by sha256 and removes
-   the original only on a match; a mismatch removes nothing. By hand:
+   the original only on a match; a mismatch removes nothing. If
+   `stamp-processed` rejects a `concept:` ref (ICOR for Life 2.2.1 or
+   earlier), pass the resolved vault path instead. By hand:
    stamp the wrapper note in its Properties panel; the file already
    moved in the first move of this step. The binary
    is done at this point and does not reach step 6.

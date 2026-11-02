@@ -290,8 +290,9 @@ The `harness.json` contract test in `run-red-tests.py` (line 3455, `_HJ`) names 
 when that dot folder did not sync, the four rooms `00 Daily Scratchpad/`, `01 Inbox/`, `03 WiP/`, `04 Inner World/` side
 by side. Step 10 placed the 3 that were unplaced: `validate-scaffold` and `check-quality` went to ICOR (they take their
 root from their own file, a fixed parent, or an explicit argument), and `new-progress-report` went to myPKA, where it
-resolves the `wip` concept through `resolve.py` like every team script. No ICOR script imports `resolve.py`: an ICOR
-folder must run without myPKA.
+resolves the `wip` concept through `resolve.py` like every team script. No ICOR script needs `resolve.py`: an ICOR
+folder must run without myPKA. `stamp-processed` (ICOR for Life 2.2.2) is the one that looks for it, for a `concept:` ref
+in `--capture`; where it does not sit beside the script, the script reads the inbox and its slots itself.
 
 ## 7. `CLAUDE_PROJECT_DIR`
 
