@@ -6,6 +6,30 @@ and what was removed or moved, every removed or moved file named in
 backticks. `check-version-bump.py` refuses a release whose shipped files
 changed without a new VERSION and a section here.
 
+## 7.0.2
+
+Fixes from a member's run through the whole Implementation Journey on a fresh
+vault with Windows, Claude Code and Codex. Nothing is removed or moved. Pairs
+with ICOR for Life 2.2.2.
+
+- Fixed: `run-red-tests.py` no longer crashes on a Windows account without the
+  symlink privilege. Every symlink it plants goes through one helper, and a case
+  that cannot plant its link is skipped by name, with the reason, while every
+  other case runs. `test-expansion-pack.py` does the same.
+- Fixed: `scaffold-init.py` matches Codex's hook-trust key on Windows: the TOML
+  key is unescaped and both sides are compared with one separator and, for a
+  Windows path, no case. A vault Codex trusted no longer reads as untrusted.
+- Fixed: `expansion-pack.py inspect` on a pack that ships only `expansion.yaml`
+  says it is a legacy pack and points at `ADAPT-EXPANSION.md` and WS-1006, where
+  it stopped on a missing `expansion.json`.
+- Changed: SOP-1002 says what to do when `stamp-processed` rejects a `concept:`
+  ref, which ICOR for Life 2.2.1 and earlier do.
+- Changed: AGENTS.md, "Show, don't just tell", tells the AI what to say when
+  Obsidian 1.14 asks "Display Mermaid diagrams in this vault?".
+- Changed: `icor-concepts/1` lists `source` and `session_ids` as optional on a
+  scratchpad, as GL-1002 does from ICOR for Life 2.2.2. GL-1013 records the one
+  ICOR script that looks for `resolve.py`.
+
 ## 7.0.1
 
 The first release of myPKA 7. The tag `v7.0.0` exists, but 7.0.0 was never
