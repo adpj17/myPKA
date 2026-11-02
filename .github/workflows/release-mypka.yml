@@ -77,11 +77,11 @@ env:
   ICOR_REPO: myICOR/icor-for-life-scaffold
   # First release only (M4): ICOR_PIN '' and ICOR_PIN_SHA = the ICOR cut
   # commit. Every later release: ICOR_PIN '2.0.0' (a tag) and its sha.
-  ICOR_PIN: '2.2.1'
-  ICOR_PIN_SHA: '929561f051e3cd4ed1813afd38ba8318fd34b8ce'  # ICOR for Life 2.2.1, tag 2.2.1 (annotated), the content of myPKA 7
+  ICOR_PIN: '2.2.2'
+  ICOR_PIN_SHA: '222f0b49e880d3e9bae0715c706a33d44a92ed07'  # ICOR for Life 2.2.2, tag 2.2.2 (annotated), the content of myPKA 7
   # The ICOR for Life release zip of ICOR_PIN that goes into the member zip
   # (7.0.0): icor-for-life-obsidian-edition-<ICOR_PIN>.zip, these bytes only.
-  ICOR_EDITION_SHA256: '407fe8ab884fc0cd4e0879bdf523ee7c13c0c6921c6e559002b5e79a57713b98'
+  ICOR_EDITION_SHA256: '15f0d81493de0d38971456373fd06efcec0e29fe653df54088a4216659fd785a'
 
 defaults:
   run:

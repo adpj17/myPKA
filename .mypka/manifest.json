@@ -2,8 +2,8 @@
   "schema": 2,
   "name": "myPKA",
   "version": "7.0.2",
-  "built": "2026-11-02T17:42:00Z",
-  "commit": "a9d3485",
+  "built": "2026-11-02T21:44:10Z",
+  "commit": "4784041",
   "lab": false,
   "requires": "icor-concepts >=1 <2",
   "files": {
@@ -240,7 +240,7 @@
   },
   "repo_only": {
     ".github/SECURITY.md": "19da61ecea4f8f720b002466ff95d38632ff1d0573e7c8e46d4b355445587eda",
-    ".github/workflows/release-mypka.yml": "f59a5799e5f9a32bfe5f1cb77a5137e28b41d48f8fa46c62672376d2093ffe4b",
+    ".github/workflows/release-mypka.yml": "2d613d4448eca88f1be4f0636cf3f44fc5f34a864b6ad9d33510c0a29396aad5",
     ".gitignore": "7c99ddb7850a7538fa1e195cae6e5089b8cccf422d26891c49f63ee5e25da888",
     "06 AI Team/AI Team Knowledge/Scripts/build-mypka-manifest.py": "db7d58083a2ddef28590d1381eeabfaa56f809385d36b2f723ea4b5af55736eb",
     "06 AI Team/AI Team Knowledge/Scripts/build-mypka-release.sh": "42d62907bf09e425880cce2e2bc245cde52b4a981f508293f52a5fde1a328353",
@@ -1496,6 +1496,7 @@
     "06 AI Team/AI Team Knowledge/Scripts/test-expansion-pack.py": [
       "1d216b7986d97a63cab147d1714de9985bf6f5b74a088aadd3a8d43b508af1d5",
       "54350ae8fbcabb1ad2d5a038989a504b8338c5622956f224cf9c4e7632c5478b",
+      "7ba4960fafa19910e669c1a5c1f75bc0ef60058095e9074ad90df3a18fe254c1",
       "8e32b33f64e6cd61321789616a8542846ea3b44fd2285eef9fae2c616bbd9ffe"
     ],
     "06 AI Team/AI Team Knowledge/Scripts/write-guard.py": [
