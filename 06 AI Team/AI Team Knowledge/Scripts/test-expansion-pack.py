@@ -122,14 +122,29 @@ class ExpansionTests(unittest.TestCase):
         source.unlink()
         elsewhere = self.root / 'outside.md'
         elsewhere.write_bytes(self.data)
-        source.symlink_to(elsewhere)
+        try:
+            source.symlink_to(elsewhere)
+        except OSError:
+            self.skipTest('no symlink privilege (Windows: enable Developer Mode)')
         self.assertNotEqual(self.call('install').returncode, 0)
         source.unlink()
         source.write_bytes(self.data)
         parent = self.root / '06 AI Team/AI Team Knowledge'
         parent.mkdir(parents=True)
-        (parent / 'SOPs').symlink_to(self.root, target_is_directory=True)
+        try:
+            (parent / 'SOPs').symlink_to(self.root, target_is_directory=True)
+        except OSError:
+            self.skipTest('no symlink privilege (Windows: enable Developer Mode)')
         self.assertNotEqual(self.call('install').returncode, 0)
+
+    def test_legacy_pack_names_the_way_forward(self):
+        (self.pack / 'expansion.json').unlink()
+        (self.pack / 'expansion.yaml').write_text('name: legacy\nversion: 1.0.0\n', encoding='utf-8')
+        result = self.call('inspect')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('legacy pack', result.stderr)
+        self.assertIn('ADAPT-EXPANSION.md', result.stderr)
+        self.assertNotIn('Traceback', result.stderr)
 
     def test_duplicate_destinations(self):
         self.manifest['files'].append(dict(self.manifest['files'][0]))

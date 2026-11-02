@@ -262,6 +262,10 @@ def prune_empty(root, created_dirs):
 def inspect(root, identifier):
     pack = pack_path(root, identifier)
     manifest = safe(pack, 'expansion.json')
+    if not manifest.is_file() and safe(pack, 'expansion.yaml').is_file():
+        raise ValueError('legacy pack: ' + identifier + ' is written for an older folder '
+                         'layout, so this tool cannot read it. Follow ADAPT-EXPANSION.md '
+                         'in the pack, then WS-1006.')
     m = json.loads(manifest.read_text())
     if m.get('schema') != 1 or m.get('id') != identifier:
         raise ValueError('Unsupported schema or mismatched id')
