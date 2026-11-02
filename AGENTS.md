@@ -163,6 +163,8 @@ and when accepted (or when the explanation clearly benefits), create it:
 4. One diagram that answers the question beats three that decorate it.
    The fullscreen viewer (the Diagrams switch in ICOR for Life - Interface) handles size; do not
    shrink content to fit.
+5. If Obsidian asks "Display Mermaid diagrams in this vault?", choose Allow (or update to
+   Obsidian 1.15+, which shows diagrams without asking).
 
 This is a standing behavior, not a feature the user must discover: the
 offer costs one sentence, the diagram often IS the answer.
