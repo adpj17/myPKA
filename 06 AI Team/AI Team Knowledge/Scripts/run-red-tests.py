@@ -233,6 +233,34 @@ def skip(name, reason):
 
 
 # ---------------------------------------------------------------------------
+# PLANTING A SYMLINK
+# ---------------------------------------------------------------------------
+#
+# Several cases plant a symlink to prove a guard will not follow one. A Windows
+# account without the symlink privilege cannot plant it (WinError 1314), and an
+# unguarded call took the whole suite down there, which scaffold-init.py then
+# reported as "could not run the suite here". Every symlink this file creates
+# goes through _try_symlink. A case that cannot plant one has nothing to
+# measure, so it is SKIPPED by name and every other case still runs. A path
+# that already exists or a parent that is missing is the fixture's own defect
+# and stays a crash: only the refusal to create the link is a skip.
+NO_SYMLINK = "no symlink privilege (Windows: enable Developer Mode)"
+
+
+class _NoSymlink(Exception):
+    pass
+
+
+def _try_symlink(src, dst, target_is_directory=False):
+    try:
+        os.symlink(src, dst, target_is_directory=target_is_directory)
+    except (FileExistsError, FileNotFoundError):
+        raise
+    except (OSError, NotImplementedError) as e:
+        raise _NoSymlink(str(e))
+
+
+# ---------------------------------------------------------------------------
 # THE POSIX SHELL, RESOLVED ONCE
 # ---------------------------------------------------------------------------
 #
@@ -3589,6 +3617,43 @@ else:
             '[hooks.state."/somewhere/else/.codex/hooks.json:PreToolUse:0:0"]\n'
             'trusted_hash = "3f9a2c"\n')
         _trust_case("unreadable", "unknown", False)
+        # the same vault, spelled the way a Windows writer spells it: a TOML
+        # basic string doubles every backslash, a literal string does not.
+        _posix_t = str((_t / "trust-escaped").resolve())
+        _trust_case(
+            "escaped", "yes",
+            '[hooks.state."%s\\\\.codex\\\\hooks.json:PreToolUse:0:0"]\n'
+            'trusted_hash = "3f9a2c"\n' % _posix_t.replace("/", "\\\\"))
+        _trust_case(
+            "literal", "yes",
+            "[hooks.state.'%s\\.codex\\hooks.json:PreToolUse:0:0']\n"
+            'trusted_hash = "3f9a2c"\n' % str((_t / "trust-literal").resolve()).replace("/", "\\"))
+        _si_spec = _ilu_root.spec_from_file_location("si_trust", SI)
+        _si_trust = _ilu_root.module_from_spec(_si_spec)
+        _si_spec.loader.exec_module(_si_trust)
+        _vault_w = "C:\\Users\\Me\\My Vault"
+        for _label, _root, _raw, _want in (
+                ("posix", "/home/me/vault", "/home/me/vault/.codex/hooks.json:PreToolUse:0:0", True),
+                ("windows-escaped", _vault_w,
+                 "C:\\\\Users\\\\Me\\\\My Vault\\\\.codex\\\\hooks.json:PreToolUse:0:0", True),
+                ("windows-forward", _vault_w, "C:/Users/Me/My Vault/.codex/hooks.json:PreToolUse:0:0", True),
+                ("windows-mixed", _vault_w,
+                 "C:\\\\Users\\\\Me\\\\My Vault/.codex/hooks.json:PreToolUse:0:0", True),
+                ("windows-case", _vault_w,
+                 "c:\\\\users\\\\me\\\\my vault\\\\.codex\\\\hooks.json:PreToolUse:0:0", True),
+                ("windows-verbatim", _vault_w,
+                 "\\\\\\\\?\\\\C:\\\\Users\\\\Me\\\\My Vault\\\\.codex\\\\hooks.json:PreToolUse:0:0", True),
+                ("windows-other-vault", _vault_w,
+                 "C:\\\\Users\\\\Me\\\\Other\\\\.codex\\\\hooks.json:PreToolUse:0:0", False),
+                ("windows-vault-prefix", _vault_w,
+                 "C:\\\\Users\\\\Me\\\\My Vault 2\\\\.codex\\\\hooks.json:PreToolUse:0:0", False),
+                ("posix-case-counts", "/home/me/vault", "/home/me/Vault/.codex/hooks.json:PreToolUse:0:0", False)):
+            _si_count()
+            if _si_trust._trust_key_matches(_si_trust._toml_basic(_raw), _root) is not _want:
+                _si_fail("scaffold-init/codex-trust-key[%s]: %r against %r was not %s"
+                         % (_label, _raw, _root, _want))
+            else:
+                _si_green()
         # and an entry for the right path that was never reviewed: a table with
         # no trusted_hash is not a trust, and reading it as one would be the
         # easiest way to write this check wrong.
@@ -5206,15 +5271,76 @@ with tempfile.TemporaryDirectory() as _b9ltd:
     if _snap9.exists() or _snap9.is_symlink():
         _snap9.unlink()
     _snap9.parent.mkdir(parents=True, exist_ok=True)
-    os.symlink(_victim9, _snap9)
-    subprocess.run([PY, str(_nonofollow9), _lsp9, "--write", str(_lsv9)],
-                   capture_output=True, text=True)
-    if _victim9.read_text(encoding="utf-8") != "untouched\n":
-        fails.append("life-snapshot/symlink-refusal-survives-no-O_NOFOLLOW: with "
-                     "O_NOFOLLOW gone, --write followed the symlink at "
-                     "snapshot.json and overwrote the file it pointed at")
+    try:
+        _try_symlink(_victim9, _snap9)
+    except _NoSymlink:
+        checks -= 1
+        skip("life-snapshot/symlink-refusal-survives-no-O_NOFOLLOW", NO_SYMLINK)
+    else:
+        subprocess.run([PY, str(_nonofollow9), _lsp9, "--write", str(_lsv9)],
+                       capture_output=True, text=True)
+        if _victim9.read_text(encoding="utf-8") != "untouched\n":
+            fails.append("life-snapshot/symlink-refusal-survives-no-O_NOFOLLOW: with "
+                         "O_NOFOLLOW gone, --write followed the symlink at "
+                         "snapshot.json and overwrote the file it pointed at")
     if _snap9.is_symlink():
         _snap9.unlink()
+
+# ===========================================================================
+# 107c. EVERY SYMLINK THIS SUITE PLANTS CAN BE REFUSED.
+#
+# One unguarded call is enough to take the suite down on a Windows account
+# without the symlink privilege, so the source is read for one: outside the
+# helper and the driver string that catches its own OSError, nothing here may
+# create a link. The helper is then fed the refusal, and a fixture defect that
+# must stay a crash.
+checks += 1
+_sl_src = Path(__file__).read_text(encoding="utf-8")
+_sl_raw = [n for n, l in enumerate(_sl_src.splitlines(), 1)
+           if re.search(r"(?<![\w.])os\.symlink\(|\.symlink_to\(", l) and '"' + "os.symlink" not in l
+           and "os.symlink(src, dst, target_is_directory" not in l
+           and 'os.symlink(outside, os.path.join(target, "06 AI Team"))' not in l
+           and "re.search(" not in l]
+if _sl_raw:
+    fails.append("symlink/every-site-guarded: lines %s create a link outside _try_symlink; on a "
+                 "Windows account without the symlink privilege that takes the suite down" % _sl_raw)
+checks += 1
+_sl_real = os.symlink
+
+
+def _sl_refuse(*a, **k):
+    e = OSError(1314, "A required privilege is not held by the client")
+    e.winerror = 1314
+    raise e
+
+
+os.symlink = _sl_refuse
+try:
+    _try_symlink("a", "b")
+    fails.append("symlink/refusal-is-a-skip: _try_symlink swallowed the refusal, so a case "
+                 "that planted nothing would still report on it")
+except _NoSymlink:
+    pass
+finally:
+    os.symlink = _sl_real
+checks += 1
+
+
+def _sl_taken(*a, **k):
+    raise FileExistsError(17, "File exists")
+
+
+os.symlink = _sl_taken
+try:
+    _try_symlink("a", "b")
+    fails.append("symlink/fixture-defect-stays-a-crash: a path that already exists was swallowed")
+except _NoSymlink:
+    fails.append("symlink/fixture-defect-stays-a-crash: a path that already exists was "
+                 "reported as a missing privilege, which would hide a broken fixture")
+except FileExistsError:
+    pass
+finally:
+    os.symlink = _sl_real
 
 # ===========================================================================
 # 108. NO SCRIPT DROPS BYTECODE INTO THE TREE IT RUNS IN.
@@ -6451,7 +6577,7 @@ def r20(src, red=False):
     outside.mkdir()
     notes = p / "icor-for-life/04 Inner World/Notes"
     shutil.rmtree(notes)
-    os.symlink(str(outside), str(notes))
+    _try_symlink(str(outside), str(notes))
     m = _r_mod(p / "mypka")
     b = m.load(m.find_team_root(start=p / "mypka" / _R_SCRIPTS / "x", env={}))
     got = _r_err(lambda: m.resolve("notes", bindings=b))
@@ -6662,6 +6788,10 @@ def _r_run(cid, fn, mutation, why):
     checks += 1
     try:
         probs = fn(_R_SRC)
+    except _NoSymlink:
+        checks -= 1
+        skip("resolver/" + cid, NO_SYMLINK)
+        return
     except Exception as e:                                        # noqa: BLE001
         probs = ["crashed: %s: %s" % (type(e).__name__, e)]
     for p_ in probs:
@@ -6724,7 +6854,7 @@ else:
             return r.returncode
 
         alias = p / "alias"
-        os.symlink(str(team), str(alias))
+        _try_symlink(str(team), str(alias))
         cases = (
             ("R28 a Write to P/mypka/AGENTS.md, env = the ICOR sibling", life, "Write",
              {"file_path": str(team / "AGENTS.md"), "content": "x\n"}, 2),
@@ -6751,10 +6881,18 @@ else:
 
     checks += 1
     _wg28_src = (HERE / "write-guard.py").read_text(encoding="utf-8")
-    for _p in r28(_wg28_src):
+    try:
+        _r28_probs = r28(_wg28_src)
+    except _NoSymlink:
+        _r28_probs = None
+        checks -= 1
+        skip("resolver/R28", NO_SYMLINK)
+    for _p in _r28_probs or ():
         fails.append("resolver/R28: %s" % _p)
     _a28 = "    rs = _resolver()\n    if rs is None:\n"
-    if _wg28_src.count(_a28) != 1:
+    if _r28_probs is None:
+        pass              # skipped above: no link planted, nothing to watch go red
+    elif _wg28_src.count(_a28) != 1:
         fails.append("resolver/R28: its mutation could not be applied (anchor gone)")
     else:
         _red28 = r28(_wg28_src.replace(_a28, "    rs = None\n    if rs is None:\n"), red=True)
@@ -6923,6 +7061,10 @@ def _v_run(cid, fn, muts, why, group="vex5"):
     checks += 1
     try:
         probs = fn({})
+    except _NoSymlink:
+        checks -= 1
+        skip("%s/%s" % (group, cid), NO_SYMLINK)
+        return
     except Exception as e:                                        # noqa: BLE001
         probs = ["crashed: %s: %s" % (type(e).__name__, e)]
     for p_ in probs:
@@ -7006,7 +7148,7 @@ def f7_wip(muts):
     outside = v.parent / "outside"
     outside.mkdir()
     link = v / "03 WiP/Operations/link-out"
-    os.symlink(str(outside), str(link))
+    _try_symlink(str(outside), str(link))
     for label, wip in (("../../outside", "../../outside"), ("absolute", str(outside)),
                        ("a symlink out", "Operations/link-out")):
         r = _v_py(pr, "--wip", wip, "--phase", "One", cwd=v)
@@ -7029,7 +7171,7 @@ def f9_ref(src, red=False):
     p = fx_b(src, "f9")
     outside = p / "outside"
     outside.mkdir()
-    os.symlink(str(outside), str(p / "icor-for-life/04 Inner World/Notes/escape"))
+    _try_symlink(str(outside), str(p / "icor-for-life/04 Inner World/Notes/escape"))
     m = _r_mod(p / "mypka")
     b = m.load(m.find_team_root(start=p / "mypka" / _R_SCRIPTS / "x", env={}))
     got = _r_err(lambda: m.resolve_ref("concept:notes/escape/x.md", bindings=b))
@@ -7338,7 +7480,7 @@ def v5r1_leaf_symlink(muts):
         ops = life / "03 WiP/Operations"
         w1 = ops / "2026-09-24-leaf"
         w1.mkdir(parents=True)
-        os.symlink(str(outside / "pwn.md"), str(w1 / "progress-report.md"))
+        _try_symlink(str(outside / "pwn.md"), str(w1 / "progress-report.md"))
         r = _v_py(pr, "--wip", "Operations/2026-09-24-leaf", "--phase", "One", cwd=team)
         if r.returncode == 0 or (outside / "pwn.md").exists():
             out.append("%s create through a dangling leaf link: exit %d, outside/pwn.md written: %s"
@@ -7347,7 +7489,7 @@ def v5r1_leaf_symlink(muts):
         keep.write_text("---\nupdated: 2000-01-01 00:00\n---\n", encoding="utf-8")
         w2 = ops / "2026-09-24-touch"
         w2.mkdir(parents=True)
-        os.symlink(str(keep), str(w2 / "progress-report.md"))
+        _try_symlink(str(keep), str(w2 / "progress-report.md"))
         r = _v_py(pr, "--wip", "Operations/2026-09-24-touch", "--touch", cwd=team)
         if r.returncode == 0 or "2000-01-01" not in keep.read_text(encoding="utf-8"):
             out.append("%s --touch through a leaf link: exit %d, outside file rewritten: %s"
@@ -8209,7 +8351,7 @@ def s12_up_symlink(muts):
     v1 = _s12_release("up-sym-v1", "1.0.0", {"06 AI Team/A.md": b"a1\n"})
     t = base / "T"
     shutil.copytree(v1, t)
-    (t / "06 AI Team/sub").symlink_to(outside, target_is_directory=True)
+    _try_symlink(outside, t / "06 AI Team/sub", target_is_directory=True)
     v2 = _s12_release("up-sym-v2", "1.1.0", {"06 AI Team/A.md": b"a1\n", "06 AI Team/sub/x.md": b"x\n"})
     r = _s12_up(muts, "up-symlink", v2, t, "--live")
     _s12_expect(out, "sub -> outside", r, 1, "symlink")
@@ -8575,7 +8717,11 @@ real = up.plan
 def racing(args):
     res = real(args)
     shutil.rmtree(os.path.join(target, "06 AI Team"))
-    os.symlink(outside, os.path.join(target, "06 AI Team"))
+    try:
+        os.symlink(outside, os.path.join(target, "06 AI Team"))
+    except OSError as e:
+        print(json.dumps({"no_symlink": str(e)}))
+        sys.exit(0)
     return res
 up.plan = racing
 rc = up.main(["x", "--release", release, "--target", target, "--live"])
@@ -8604,6 +8750,8 @@ def s12_up20_race(muts):
         res = json.loads(r.stdout.strip().splitlines()[-1])
     except (ValueError, IndexError):
         return ["the race driver crashed: %s" % (r.stderr or r.stdout).strip()[-200:]]
+    if "no_symlink" in res:
+        raise _NoSymlink(res["no_symlink"])
     if res["rc"] != 1:
         out.append("the swapped folder did not stop the run (exit %r)" % res["rc"])
     if res["outside"]:
@@ -8624,7 +8772,7 @@ def s12_up21_self_listed(muts):
     t = base / "T"
     t.mkdir()
     (t / "AGENTS.md").write_bytes(b"a\n")
-    os.symlink(str(outside.resolve()), str(t / ".mypka"))
+    _try_symlink(str(outside.resolve()), str(t / ".mypka"))
     r_dir = base / "R"
     (r_dir / ".mypka").mkdir(parents=True)
     (r_dir / "AGENTS.md").write_bytes(b"b\n")
