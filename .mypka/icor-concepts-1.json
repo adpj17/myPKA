@@ -443,6 +443,14 @@
           "required": false,
           "kind": "wikilink_list",
           "target": "any"
+        },
+        "source": {
+          "required": false,
+          "kind": "text"
+        },
+        "session_ids": {
+          "required": false,
+          "kind": "list"
         }
       }
     },
